@@ -1,10 +1,10 @@
 version: 2.1
 
 parameters:
-  environment:
+  deploy_target:
     type: string
-    default: "staging"
-    enum: ["staging", "production"]
+    default: "development"
+    enum: ["staging", "production", "development"]
 
 jobs:
   build:
@@ -12,26 +12,77 @@ jobs:
       - image: circleci/node:latest
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - node-dependencies-{{ checksum "package-lock.json" }}
       - run:
           name: Install Dependencies
+          command: npm install
+      - save_cache:
+          key: node-dependencies-{{ checksum "package-lock.json" }}
+          paths:
+            - ./node_modules
+      - run:
+          name: Build the Project
+          command: npm run build
+      - run:
+          name: Display Current Branch
+          command: echo "Current branch: $CIRCLE_BRANCH"
+
+  test:
+    docker:
+      - image: circleci/node:latest
+    parallelism: 2
+    steps:
+      - checkout
+      - run:
+          name: Run Tests
           command: |
-            npm install
+            echo "Running tests in parallel environment: $CIRCLE_NODE_INDEX"
+            npm test -- --shard=$CIRCLE_NODE_INDEX
 
   deploy:
     docker:
-      - image: circleci/node:14
+      - image: circleci/node:latest
     parameters:
-      environment:
+      deploy_target:
         type: string
     steps:
+      - checkout
+      - run:
+          name: Notify Deployment
+          command: echo "Deploying to << parameters.deploy_target >> environment."
       - when:
           condition:
-            or:
-              - equal: [ << pipeline.parameters.environment >>, "staging" ]
-              - equal: [ << pipeline.parameters.environment >>, "production" ]
+            equal: [ << parameters.deploy_target >>, "production" ]
           steps:
             - run:
-                name: Deploy
-                command: |
-                  echo "Deploying to << parameters.environment >> environment."
+                name: Production Verification Step
+                command: echo "Performing extra verification for production deployment."
+      - run:
+          name: Deployment Complete
+          command: echo "Deployment to << parameters.deploy_target >> is finished!"
 
+workflows:
+  version: 2
+  build-test-deploy:
+    jobs:
+      - build
+      - test:
+          filters:
+            branches:
+              ignore:
+                - /feature\/.*/
+      - deploy:
+          requires:
+            - build
+            - test
+          filters:
+            branches:
+              only:
+                - main
+            tags:
+              only:
+                - /^v.*/
+          parameters:
+            deploy_target: << pipeline.parameters.deploy_target >>
