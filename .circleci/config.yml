@@ -27,7 +27,7 @@ jobs:
           command: npm run build
       - run:
           name: Display Current Branch
-          command: echo "Current branch: $CIRCLE_BRANCH"
+          command: 'echo "Current branch: $CIRCLE_BRANCH"'
 
   test:
     docker:
