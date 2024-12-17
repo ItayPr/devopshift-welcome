@@ -4,18 +4,19 @@ parameters:
   environment:
     type: string
     default: "staging"
-	enum: ["staging", "production"]
+    enum: ["staging", "production"]
 
 jobs:
   build:
     docker:
       - image: circleci/node:latest
     steps:
-	  -checkout 
-	  - run:
-	    name: Install Dependencies
-	    command: |
-		  npm install
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            npm install
+
   deploy:
     docker:
       - image: circleci/node:14
@@ -26,7 +27,21 @@ jobs:
       - when:
           condition:
             or:
-              - equal: [ << pipeline.parameters.env >>, "staging" ]
-              - equal: [ << pipeline.parameters.env >>, "production" ]
+              - equal: [ << pipeline.parameters.environment >>, "staging" ]
+              - equal: [ << pipeline.parameters.environment >>, "production" ]
           steps:
-            - run: echo "Deploying to $<< pipeline.parameters.env >> environment."
+            - run:
+                name: Deploy
+                command: |
+                  echo "Deploying to << parameters.environment >> environment."
+
+workflows:
+  version: 2
+  build-and-deploy:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
+          parameters:
+            environment: << pipeline.parameters.environment >>
