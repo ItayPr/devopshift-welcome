@@ -48,7 +48,7 @@ workflows:
   version: 2
   build-deploy:
     jobs:
-      - build:
+      - build
       - deploy:
           requires:
             - build
@@ -56,4 +56,7 @@ workflows:
             branches:
               only:
                 - main
+            tags:
+              only:
+                - /^v.*/
           environment: "production"
